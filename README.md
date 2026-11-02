@@ -57,15 +57,22 @@ console.log(await res.json());
 
 ## 支持的路径形式
 
-目标地址必须带 `http://` 或 `https://`，省略协议的写法（如 `/www.google.com`）会被拒绝：
+目标地址必须带 `http://` 或 `https://`，省略协议的写法（如 `/www.google.com`）会被拒绝。
+协议后少一个斜杠也接受（`/https:/example.com`），因为 nginx 这类前置代理默认会把路径里的
+`//` 合并成一个 `/`：
 
 | 请求路径                                | 代理到                                 |
 | --------------------------------------- | -------------------------------------- |
 | `/https://www.google.com/search?q=rust` | `https://www.google.com/search?q=rust` |
+| `/https:/www.google.com`                | `https://www.google.com`（斜杠被合并） |
 | `/http://127.0.0.1:8080/api/items`      | `http://127.0.0.1:8080/api/items`      |
 | `/https%3A%2F%2Fwww.google.com`         | `https://www.google.com`（百分号编码） |
 | `/www.google.com`                       | `400`，缺少协议                        |
 | `/ftp://example.com/a`                  | `400`，只允许 http / https             |
+
+> 目标 URL 内部的连续斜杠同样会被前置代理合并（`https://host/a//b` 会变成 `https://host/a/b`），
+> 这段信息在代理收到请求前就已经丢了，应用无法还原。需要精确保留路径里的 `//` 时，
+> 改用百分号编码的整体形式（`/https%3A%2F%2Fhost%2Fa%2F%2Fb`），它不会被合并。
 
 ## 访问控制
 

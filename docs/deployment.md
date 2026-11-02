@@ -142,3 +142,26 @@ git push origin v1.2.3
 docker compose build                          # 等价于校验 Dockerfile
 docker buildx build --platform linux/arm64 .   # 单独验证 arm64（Apple Silicon 上是原生构建）
 ```
+
+## 前置反向代理（Nginx / CDN）
+
+代理生成重定向地址时需要知道自己的对外地址。设置 `PUBLIC_BASE_URL`（例如
+`https://proxy.example.com`），或者让前置代理传 `Host` 和 `X-Forwarded-Proto`。
+
+Nginx 默认开启 `merge_slashes`，会把路径里的 `//` 合并成一个 `/`，于是
+`/https://example.com` 到达应用时已经变成 `/https:/example.com`。应用会把这个位置
+缺掉的一个斜杠补回来，所以默认配置下也能用；要完全按原样转发可以关掉：
+
+```nginx
+location / {
+    merge_slashes off;                    # nginx 1.13.0+
+    proxy_buffering off;                  # 保持流式，SSE 之类才不会被攒住
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+`merge_slashes off` 是 nginx 1.13.0 才有的指令。即使关掉，也建议在需要精确保留
+路径里 `//` 时使用百分号编码的形式（`/https%3A%2F%2F...`），因为有些 CDN 并不
+提供关闭选项。

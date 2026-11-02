@@ -67,15 +67,23 @@ console.log(await res.json());
 ## Supported path forms
 
 The target must include an explicit `http://` or `https://`; a scheme-less form such
-as `/www.google.com` is rejected:
+as `/www.google.com` is rejected. A single slash after the scheme is also accepted
+(`/https:/example.com`), because reverse proxies such as nginx collapse `//` in the
+path by default:
 
 | Request path                            | Proxied to                                 |
 | --------------------------------------- | ------------------------------------------ |
 | `/https://www.google.com/search?q=rust` | `https://www.google.com/search?q=rust`     |
+| `/https:/www.google.com`                | `https://www.google.com` (slash collapsed) |
 | `/http://127.0.0.1:8080/api/items`      | `http://127.0.0.1:8080/api/items`          |
 | `/https%3A%2F%2Fwww.google.com`         | `https://www.google.com` (percent-encoded) |
 | `/www.google.com`                       | `400`, missing scheme                      |
 | `/ftp://example.com/a`                  | `400`, only http / https is allowed        |
+
+> Consecutive slashes inside the target are collapsed the same way (`https://host/a//b`
+> becomes `https://host/a/b`). That information is gone before the proxy sees the
+> request, so it cannot be restored. When the exact path matters, use the fully
+> percent-encoded form (`/https%3A%2F%2Fhost%2Fa%2F%2Fb`), which is not collapsed.
 
 ## Access control
 
