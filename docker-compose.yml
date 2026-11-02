@@ -1,10 +1,8 @@
 services:
   urlproxy:
     # 默认本地构建，`docker compose up -d --build` 即可。
-    # 想直接用 GitHub Packages 上 CI 构建好的镜像，设置环境变量（或在 .env 里写一行）：
-    #   URLPROXY_IMAGE=ghcr.io/<github-owner>/<repo>:latest
-    # 然后 `docker compose pull && docker compose up -d`。
-    image: ${URLPROXY_IMAGE:-urlproxy:local}
+    # 直接用 GitHub Packages 上 CI 构建好的镜像
+    image: ghcr.io/lijc210/urlproxy:latest
     build:
       context: .
       dockerfile: Dockerfile

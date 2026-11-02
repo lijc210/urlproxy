@@ -6,10 +6,10 @@
 
 `Dockerfile` 是两阶段构建：
 
-| 阶段      | 基础镜像                  | 作用                                                   |
-| --------- | ------------------------- | ------------------------------------------------------ |
-| `builder` | `rust:1.91-slim-bookworm` | 编译 release 二进制                                    |
-| `runtime` | `debian:bookworm-slim`    | 只放二进制 + `ca-certificates` + `curl`（供健康检查）  |
+| 阶段      | 基础镜像                  | 作用                                                  |
+| --------- | ------------------------- | ----------------------------------------------------- |
+| `builder` | `rust:1.91-slim-bookworm` | 编译 release 二进制                                   |
+| `runtime` | `debian:bookworm-slim`    | 只放二进制 + `ca-certificates` + `curl`（供健康检查） |
 
 依赖层单独缓存的做法：
 
@@ -38,11 +38,10 @@ RUN touch src/main.rs && cargo build --release --locked
 ## docker-compose
 
 ```bash
-# 本地构建并启动
+# 本地构建并启动（用 compose 里的 build 配置构建，并打上 image: 里的 tag）
 docker compose up -d --build
 
-# 使用 GHCR 上已发布的镜像
-export URLPROXY_IMAGE=ghcr.io/<owner>/<repo>:latest
+# 或直接拉取 GHCR 上已发布的多架构镜像
 docker compose pull && docker compose up -d
 ```
 
@@ -58,8 +57,11 @@ environment:
   PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
 ```
 
-`image:` 用的是 `${URLPROXY_IMAGE:-urlproxy:local}`：默认打本地 tag，不去 Docker Hub
-猜一个可能不存在的镜像；要消费 GHCR 上的镜像时通过变量覆盖。
+`image:` 写的是固定名字 `ghcr.io/lijc210/urlproxy:latest`，和 workflow 里的
+`ghcr.io/${{ github.repository }}` 对应：只有 GitHub 仓库叫 `urlproxy` 时两者才一致，
+所以发布前要确认仓库名；不一致就改 compose 里的 `image:` 一行。
+本地的 `docker compose up -d --build` 会把这个 tag 指向本地构建的镜像，
+所以不会去拉一个可能不存在的远程镜像。
 
 编排里还设置了：
 
@@ -69,22 +71,45 @@ environment:
 
 ## 自动打包（GitHub Packages / GHCR）
 
-`.github/workflows/docker.yml` 分两个 job：
+`.github/workflows/docker.yml` 分三个 job：
 
 1. `check`：`cargo fmt --all --check`、`cargo clippy --all-targets --locked -- -D warnings`、
    `cargo test --locked`，用 `Swatinem/rust-cache` 缓存。
-2. `publish`：`needs: check`，用 buildx 构建并推送多架构镜像，`cache-from/to: type=gha`。
+2. `build`：matrix 两个条目，`linux/amd64` 跑在 `ubuntu-24.04`、`linux/arm64` 跑在
+   `ubuntu-24.04-arm`，各自在自己的原生 CPU 上编译，然后按 digest 推送单平台镜像
+   （`push-by-digest=true,name-canonical=true`），GHA 缓存用 `scope=<arch>` 分开存。
+3. `merge`：`needs: [check, build]`，下载各平台的 digest，用
+   `docker buildx imagetools create` 合成 manifest list 并打上 tag。
 
-任何一步检查失败都不会发布镜像。
+`check` 和 `build` 并行执行，`merge` 在两者都成功后才发布，
+所以检查失败的提交不会产生带 tag 的镜像。PR 只跑 `check` 和两个平台的 `build`（不推送）。
+
+### 为什么不用 QEMU
+
+早期版本用 `platforms: linux/amd64,linux/arm64` 配合 `setup-qemu-action`，在 x86 runner
+上模拟构建 arm64。Rust 编译是 CPU 密集型负载，在 QEMU 用户态模拟下会慢 5～15 倍，
+冷缓存时一次构建要 15～30 分钟。现在 arm64 用 GitHub 的原生 arm64 runner，
+两个平台都是原生编译，同样的流水线通常 3～5 分钟跑完。
+
+前提：原生 arm64 runner 对 **public 仓库**免费；private 仓库使用 `ubuntu-24.04-arm`
+会计费。不想承担这部分成本的话，把 matrix 里 arm64 那一条删掉即可，只发 amd64
+（Apple Silicon 上的 Docker Desktop 可以用 Rosetta 运行 amd64 镜像）。
+
+### 为什么按 digest 分开推送
+
+多架构镜像不能在两个 runner 上各自打同一个 tag（后推送的会覆盖前一个）。
+所以每个平台只推送一个不带 tag 的 digest，再由 `merge` job 把两个 digest
+合成 manifest list，最后才打上 `latest` / `1.2.3` 这些 tag。
+这也意味着 `merge` 失败时 registry 里只会留下两个没人引用的 digest，不会污染已有 tag。
 
 ### 触发条件与 tag
 
-| 触发条件                 | 推送的 tag                           |
-| ------------------------ | ------------------------------------ |
-| push 到 `main`           | `latest`、`main`、`sha-<短 sha>`     |
-| push `v1.2.3` 形式的 tag | `1.2.3`、`1.2`、`1`、`sha-<短 sha>`  |
-| Pull Request             | 只构建、不推送（tag 为 `pr-<编号>`） |
-| 手动 `workflow_dispatch` | 按所在分支的规则                     |
+| 触发条件                 | 推送的 tag                          |
+| ------------------------ | ----------------------------------- |
+| push 到 `main`           | `latest`、`main`、`sha-<短 sha>`    |
+| push `v1.2.3` 形式的 tag | `1.2.3`、`1.2`、`1`、`sha-<短 sha>` |
+| Pull Request             | 只构建两个平台、不推送              |
+| 手动 `workflow_dispatch` | 按所在分支的规则                    |
 
 PR 触发带了 `paths` 过滤，只有 Dockerfile、compose、依赖清单、`src/`、`assets/` 或
 工作流本身变化时才跑。
@@ -105,15 +130,15 @@ git push origin v1.2.3
 - 工作流里已声明 `permissions: packages: write`，不需要额外改仓库的 Workflow permissions。
 - 首次发布后包默认是 private，别人 `docker compose pull` 前需要 `docker login ghcr.io`；
   想让镜像公开就到仓库的 Packages 页面改可见性。
-- 本仓库当前会同步到 `github.com/lijc210/myscripts`（见 `.cnb/web_trigger.yml`），
-  所以发布出来是 `ghcr.io/lijc210/myscripts:latest`。想用别的名字，另建一个 GitHub 仓库即可，
-  工作流不用改。
-- 工作流假设项目位于仓库根目录。如果同步到某个子目录，需要给两个 job 加
-  `working-directory`，并给 `publish` 的 build 加 `context` 指向该子目录。
+- 本仓库当前会同步到 GitHub，镜像名随仓库名走。按 compose 里的配置，
+  GitHub 仓库应该命名为 `urlproxy`，发布出来才是 `ghcr.io/lijc210/urlproxy:latest`。
+  仓库名不同也可以，改 compose 里的 `image:` 一行即可，工作流不用动。
+- 工作流假设项目位于仓库根目录。如果同步到某个子目录，需要给 `check` / `build` / `merge`
+  加 `working-directory`，并给 `build` 的 build 加 `context` 指向该子目录。
 
 ### 本地验证构建
 
 ```bash
-docker compose build                        # 等价于校验 Dockerfile
-docker buildx build --platform linux/arm64 . # 交叉构建单架构验证
+docker compose build                          # 等价于校验 Dockerfile
+docker buildx build --platform linux/arm64 .   # 单独验证 arm64（Apple Silicon 上是原生构建）
 ```

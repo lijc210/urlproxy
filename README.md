@@ -137,12 +137,14 @@ PROXY_TOKEN=s3cret ALLOWED_HOSTS=example.com,api.internal.test cargo run --relea
 docker compose up -d --build
 
 # 或者直接使用 GitHub Packages 上已发布的多架构镜像
-export URLPROXY_IMAGE=ghcr.io/<github-owner>/<repo>:latest
 docker compose pull && docker compose up -d
 ```
 
 容器以非 root 用户运行，自带 `HEALTHCHECK`（请求 `GET /healthz`），
 配置项同样通过环境变量传入（可写在 `.env` 里）。
+
+`docker-compose.yml` 里的 `image:` 是固定值 `ghcr.io/lijc210/urlproxy:latest`，
+和 GitHub 仓库名对应；仓库不叫 `urlproxy` 的话改这一行即可。
 
 镜像构建、compose 细节、GitHub Packages 自动打包流程见
 [部署与镜像发布](docs/deployment.md)。

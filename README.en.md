@@ -14,7 +14,7 @@ send CORS headers.
 
 ## Features
 
-- **Forward by path**: the target URL *is* the request path, with full support for
+- **Forward by path**: the target URL _is_ the request path, with full support for
   query strings and request bodies.
 - **Streaming in both directions**: request and response bodies are forwarded as
   they arrive, never buffered in memory, so large uploads and downloads are not cut off.
@@ -69,13 +69,13 @@ console.log(await res.json());
 The target must include an explicit `http://` or `https://`; a scheme-less form such
 as `/www.google.com` is rejected:
 
-| Request path                            | Proxied to                             |
-| --------------------------------------- | -------------------------------------- |
-| `/https://www.google.com/search?q=rust` | `https://www.google.com/search?q=rust` |
-| `/http://127.0.0.1:8080/api/items`      | `http://127.0.0.1:8080/api/items`      |
+| Request path                            | Proxied to                                 |
+| --------------------------------------- | ------------------------------------------ |
+| `/https://www.google.com/search?q=rust` | `https://www.google.com/search?q=rust`     |
+| `/http://127.0.0.1:8080/api/items`      | `http://127.0.0.1:8080/api/items`          |
 | `/https%3A%2F%2Fwww.google.com`         | `https://www.google.com` (percent-encoded) |
-| `/www.google.com`                       | `400`, missing scheme                  |
-| `/ftp://example.com/a`                  | `400`, only http / https is allowed    |
+| `/www.google.com`                       | `400`, missing scheme                      |
+| `/ftp://example.com/a`                  | `400`, only http / https is allowed        |
 
 ## Access control
 
@@ -135,13 +135,13 @@ ALLOWED_HOSTS=example.com,api.internal.test ./urlproxy
 
 Configured through environment variables:
 
-| Variable          | Default                         | Description                                                                                                                                                                        |
-| ----------------- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ADDR`            | `0.0.0.0:3000`                  | Listen address                                                                                                                                                                     |
-| `PROXY_TOKEN`     | empty (no authentication)       | Shared access token; when set, every proxied request must present it                                                                                                                |
-| `ALLOWED_HOSTS`   | empty (all hosts allowed)       | Comma-separated target host allowlist; matches subdomains and supports `*`                                                                                                          |
+| Variable          | Default                         | Description                                                                                                                                                                                                   |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ADDR`            | `0.0.0.0:3000`                  | Listen address                                                                                                                                                                                                |
+| `PROXY_TOKEN`     | empty (no authentication)       | Shared access token; when set, every proxied request must present it                                                                                                                                          |
+| `ALLOWED_HOSTS`   | empty (all hosts allowed)       | Comma-separated target host allowlist; matches subdomains and supports `*`                                                                                                                                    |
 | `PUBLIC_BASE_URL` | empty                           | Externally visible origin of the proxy, e.g. `https://proxy.example.com`. Needed behind Nginx or a gateway to build redirect URLs; when unset, it is inferred from the request's `Host` / `X-Forwarded-Proto` |
-| `RUST_LOG`        | `urlproxy=info,tower_http=info` | Log level                                                                                                                                                                          |
+| `RUST_LOG`        | `urlproxy=info,tower_http=info` | Log level                                                                                                                                                                                                     |
 
 ```bash
 PROXY_TOKEN=s3cret ALLOWED_HOSTS=example.com,api.internal.test cargo run --release
@@ -154,7 +154,6 @@ PROXY_TOKEN=s3cret ALLOWED_HOSTS=example.com,api.internal.test cargo run --relea
 docker compose up -d --build
 
 # Or use the multi-arch image published to GitHub Packages
-export URLPROXY_IMAGE=ghcr.io/<github-owner>/<repo>:latest
 docker compose pull && docker compose up -d
 ```
 
@@ -163,8 +162,9 @@ The container runs as a non-root user and ships with a `HEALTHCHECK` (it calls
 can also be written to the `.env` file next to `docker-compose.yml`, which compose
 loads automatically.
 
-`URLPROXY_IMAGE` is the only variable that selects the image; `PROXY_TOKEN`,
-`ALLOWED_HOSTS` and `PUBLIC_BASE_URL` are read from the environment (or `.env`).
+`docker-compose.yml` pins the image to `ghcr.io/lijc210/urlproxy:latest`, which
+matches the GitHub repository name. If your repository is named differently, change
+that single line.
 See [Deployment and image publishing](docs/deployment.md) (Chinese) for build
 details and the GitHub Packages pipeline.
 
