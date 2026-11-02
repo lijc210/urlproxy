@@ -1,0 +1,2 @@
+include:
+    - ./.cnb/web_trigger.yml # 自动触发3

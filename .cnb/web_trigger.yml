@@ -1,0 +1,29 @@
+# .cnb/web_trigger.yml
+branch:
+    # 如下按钮在分支名以 main 开头的分支详情页面显示
+    - reg: "^main"
+    # 如下自定义按钮在所有分支详情页面显示
+    - buttons:
+          - name: 推送到github
+            description: 推送到github
+            event: web_trigger_github
+
+# 分支名
+main:
+    # 手动触发
+    web_trigger_github:
+        - imports:
+              # 引用密钥仓库中的特定文件
+              - https://cnb.cool/lijc210/secret/-/blob/main/env.prod.yml
+          stages:
+              - name: 同步到github
+                image: tencentcom/git-sync
+                env:
+                settings:
+                    target_url: https://github.com/lijc210/urlproxy.git
+                    auth_type: https
+                    username: ${GITHUB_USER}
+                    password: ${GITHUB_TOKEN}
+                    sync_mode: push # 推送
+                    force: true # 强制推送
+                    # push_tags: true

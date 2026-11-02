@@ -1,0 +1,34 @@
+services:
+  urlproxy:
+    # 默认本地构建，`docker compose up -d --build` 即可。
+    # 想直接用 GitHub Packages 上 CI 构建好的镜像，设置环境变量（或在 .env 里写一行）：
+    #   URLPROXY_IMAGE=ghcr.io/<github-owner>/<repo>:latest
+    # 然后 `docker compose pull && docker compose up -d`。
+    image: ${URLPROXY_IMAGE:-urlproxy:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      ADDR: 0.0.0.0:3000
+      RUST_LOG: urlproxy=info,tower_http=info
+      # 共享访问 token；留空表示不鉴权。
+      PROXY_TOKEN: ${PROXY_TOKEN:-}
+      # 目标域名白名单，逗号分隔；留空表示允许所有域名。
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+      # 部署在 Nginx / 网关后面时设置对外地址，
+      # 这样重写后的 3xx 重定向才会指回正确的域名：
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

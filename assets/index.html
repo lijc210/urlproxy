@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>urlproxy</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      max-width: 46rem;
+      margin: 6rem auto;
+      padding: 0 1.5rem;
+    }
+    h1 { margin-bottom: .5rem; }
+    code {
+      background: rgba(127, 127, 127, .15);
+      padding: .15rem .35rem;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+    form { display: flex; gap: .5rem; margin: 1.75rem 0 1rem; }
+    input {
+      flex: 1;
+      padding: .6rem .75rem;
+      font: inherit;
+      color: inherit;
+      background: transparent;
+      border: 1px solid rgba(127, 127, 127, .5);
+      border-radius: 6px;
+    }
+    button {
+      padding: .6rem 1.15rem;
+      font: inherit;
+      color: #fff;
+      background: #2f6fed;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    p.hint { margin: .4rem 0; opacity: .7; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>urlproxy</h1>
+  <p>把目标地址直接拼在本服务地址后面即可访问（目标地址必须带 <code>http://</code> 或 <code>https://</code>）：</p>
+  <p><code id="example"></code></p>
+
+  <form id="form">
+    <input id="url" placeholder="https://example.com" autocomplete="off" spellcheck="false" autofocus>
+    <button type="submit">访问</button>
+  </form>
+
+  <p class="hint">健康检查：<code>/healthz</code></p>
+  <p class="hint">服务启用了访问 token 时，请求需要带上 <code>X-Proxy-Token</code> 头，
+    或者 <code>?proxy_token=&lt;token&gt;</code>。
+    <code>Authorization</code> 头会原样转发给目标，不作为代理凭证。
+    从带 token 的本页跳转时会自动把 <code>proxy_token</code> 拼到地址里。</p>
+
+  <script>
+    const base = location.origin + "/";
+    const token = new URLSearchParams(location.search).get("proxy_token");
+
+    document.getElementById("example").textContent = base + "https://example.com";
+
+    document.getElementById("form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const target = document.getElementById("url").value.trim();
+      if (!target) return;
+
+      if (!/^https?:\/\//i.test(target)) {
+        alert("目标地址必须以 http:// 或 https:// 开头");
+        return;
+      }
+
+      let url = base + target;
+      if (token) {
+        url += (target.includes("?") ? "&" : "?") + "proxy_token=" + encodeURIComponent(token);
+      }
+      location.href = url;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+[package]
+name = "urlproxy"
+version = "0.1.0"
+edition = "2021"
+description = "A path based HTTP URL proxy built on axum and reqwest"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.8", features = ["http2"] }
+percent-encoding = "2"
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls",
+    "stream",
+    "http2",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tower-http = { version = "0.6", features = ["trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
